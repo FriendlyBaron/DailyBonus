@@ -1,6 +1,5 @@
 package me.itsatacoshop247.DailyBonus;
 
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 
@@ -12,6 +11,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 
 
@@ -34,20 +34,21 @@ public class DailyBonusPlayerListener implements Listener //part of new method, 
 		{
 			return;
 		}
-		int tiers = plugin.getConfig().getInt("Main.Number of Tiers");
+		int tiers = plugin.config.getInt("Main.Number of Tiers");
 		for(int x = tiers; x > 0; x--)
 		{
 			if(player.hasPermission("dailybonus.tier." + x))
 			{
-				if(plugin.getConfig().getInt("Main.Item Give Delay (In Seconds)") > 0)
+				if(plugin.config.getInt("Main.Item Give Delay (In Seconds)") > 0)
 				{
 					Runnable r = new DailyBonusItemDelay(plugin, player, x);
 					new Thread(r).start();
+					plugin.playerList.add(player);
 					x = -666;
 				}
 				else
 				{
-					int amount = plugin.getConfig().getInt("Tier." + x + ".Economy Amount");
+					int amount = plugin.config.getInt("Tier." + x + ".Economy Amount");
 					if(amount != 0)
 					{
 						if(DailyBonus.econ != null)
@@ -57,11 +58,11 @@ public class DailyBonusPlayerListener implements Listener //part of new method, 
 						}
 						else
 						{
-						player.sendMessage(ChatColor.DARK_RED + "The DailyBonus plugin would have given you economy money, but the server doesn't have Vault enabled, or it is not enabled correctly!");
+							player.sendMessage(ChatColor.DARK_RED + "The DailyBonus plugin would have given you economy money, but the server doesn't have Vault enabled, or it is not enabled correctly!");
 						}
 					}
-					player.sendMessage(replaceColors(plugin.getConfig().getString("Tier." + x + ".Message").replaceAll("!amount", "" + amount)));
-					List<?> items = plugin.getConfig().getList("Tier." + x + ".Items");
+					player.sendMessage(replaceColors(plugin.config.getString("Tier." + x + ".Message").replaceAll("!amount", "" + amount)));
+					List<?> items = plugin.config.getList("Tier." + x + ".Items");
 					String[] items1 = (String[]) items.toArray(new String[0]);
 					for(int y = 0; y < items1.length; y++)
 					{
@@ -72,9 +73,9 @@ public class DailyBonusPlayerListener implements Listener //part of new method, 
 							player.getInventory().addItem(is);
 						}
 					}
-					if(plugin.getConfig().getBoolean("Main.Global Message is Enabled"))
+					if(plugin.config.getBoolean("Main.Global Message is Enabled"))
 					{
-						plugin.getServer().broadcastMessage(replaceColors(plugin.getConfig().getString("Main.Global Message").replaceAll("!amount", "" + amount).replaceAll("!playername", "" + player.getDisplayName())));
+						plugin.getServer().broadcastMessage(replaceColors(plugin.config.getString("Main.Global Message").replaceAll("!amount", "" + amount).replaceAll("!playername", "" + player.getDisplayName())));
 					}
 					x = -666;
 				}
@@ -82,43 +83,64 @@ public class DailyBonusPlayerListener implements Listener //part of new method, 
 		}	
 	}	
 
+	@EventHandler
+	public void onPlayerQuit(PlayerQuitEvent event)
+	{
+		Player player = event.getPlayer();
+		if(plugin.players.get("Players." + player.getName() + ".Last") != null)
+		{
+			plugin.players.set(("Players." + player.getName() + ".Last"), System.currentTimeMillis());
+			plugin.savePlayers();
+		}
+		else
+		{
+			plugin.players.addDefault("Players." + player.getName() + ".Last", System.currentTimeMillis());
+			plugin.savePlayers();
+		}
+		
+		if(plugin.playerList.contains(player))
+		{
+			plugin.players.set("Players." + player.getName() + ".Logged Early", true);
+			plugin.playerList.remove(player);
+			
+			if(plugin.numEarly.containsKey(player))
+			{
+				int already = plugin.numEarly.get(player);
+				plugin.numEarly.remove(player);
+				plugin.numEarly.put(player, (already+1));
+			}
+			else
+			{
+				plugin.numEarly.put(player, 1);
+			}
+		}
+	}
 
 	private boolean CheckLastLogin(Player p) {
-		if(plugin.getConfig().getList("Players for first login") != null)
+		if(plugin.players.get("Players." + p.getName() + ".Logged Early") != null)
 		{
-			String[] set = {""};
-			set[0] = p.getName();
-			if(!plugin.getConfig().getList("Players for first login").contains(p.getName()))
+			if(plugin.players.getBoolean("Players." + p.getName() + ".Logged Early"))
 			{
-				@SuppressWarnings("unchecked")
-				List<String> list = (List<String>) plugin.getConfig().getList("Players for first login");
-				list.addAll(Arrays.asList(set));
-				plugin.getConfig().set("Players for first login", list);
-				plugin.saveConfig();
+				plugin.players.set("Players." + p.getName() + ".Logged Early", false);
 				return true;
 			}
 		}
-		else if(plugin.getConfig().getList("Players for first login") == null)
+		if(plugin.players.get("Players." + p.getName() + ".Last") != null)
 		{
-			List<String> list = Arrays.asList(p.getName());
-			plugin.getConfig().addDefault("Players for first login", list);
-			plugin.saveConfig();
-			return true;
+			Calendar current = Calendar.getInstance();
+			Calendar last = Calendar.getInstance();
+			last.setTimeInMillis(plugin.players.getLong("Players." + p.getName() + ".Last"));
+			
+			if(last.get(Calendar.DATE) < current.get(Calendar.DATE) || (last.get(Calendar.MONTH) + 1) < (current.get(Calendar.MONTH) + 1))
+			{
+				return true;
+			}
 		}
-		
-		if(!p.hasPlayedBefore())
+		else
 		{
-			return true;
-		}
-		Calendar current = Calendar.getInstance();
-		Calendar last = Calendar.getInstance();
-		last.setTimeInMillis(p.getLastPlayed());
-		int day = current.get(Calendar.DATE);
-		int month = (current.get(Calendar.MONTH) + 1);
-		int day2 = last.get(Calendar.DATE);
-		int month2 = (last.get(Calendar.MONTH) + 1);
-		if(day2 > day && month2 >= month) //86,400,000 is 1 day exactly. If the player is new the value is 0 which keeps statement true
-		{
+			plugin.players.addDefault("Players." + p.getName() + ".Last", System.currentTimeMillis());
+			plugin.players.addDefault("Players." + p.getName() + ".Logged Early", false);
+			plugin.savePlayers();
 			return true;
 		}
 		return false;

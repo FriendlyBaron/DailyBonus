@@ -28,16 +28,16 @@ public class DailyBonusItemDelay implements Runnable {
 		{
 			try
 			{
-				Thread.sleep(plugin.getConfig().getInt("Main.Item Give Delay (In Seconds)")*1000);
+				Thread.sleep(plugin.config.getInt("Main.Item Give Delay (In Seconds)")*1000);
 			}
 			catch (InterruptedException e)
 			{
 				e.printStackTrace();
 			}
 		}
-		if(player.isOnline() && plugin.isEnabled())
+		if(player.isOnline() && plugin.isEnabled() && !plugin.numEarly.containsKey(player))
 		{
-			int amount = plugin.getConfig().getInt("Tier." + num + ".Economy Amount");
+			int amount = plugin.config.getInt("Tier." + num + ".Economy Amount");
 			if(amount != 0)
 			{
 				if(DailyBonus.econ != null)
@@ -47,11 +47,11 @@ public class DailyBonusItemDelay implements Runnable {
 				}
 				else
 				{
-				player.sendMessage(ChatColor.DARK_RED + "The DailyBonus plugin would have given you economy money, but the server doesn't have Vault enabled, or it is not enabled correctly!");
+					player.sendMessage(ChatColor.DARK_RED + "The DailyBonus plugin would have given you economy money, but the server doesn't have Vault enabled, or it is not enabled correctly!");
 				}
 			}
-			player.sendMessage(DailyBonusPlayerListener.replaceColors(plugin.getConfig().getString("Tier." + num + ".Message").replaceAll("!amount", "" + amount)));
-			List<?> items = plugin.getConfig().getList("Tier." + num + ".Items");
+			player.sendMessage(DailyBonusPlayerListener.replaceColors(plugin.config.getString("Tier." + num + ".Message").replaceAll("!amount", "" + amount)));
+			List<?> items = plugin.config.getList("Tier." + num + ".Items");
 			String[] items1 = (String[]) items.toArray(new String[0]);
 			for(int y = 0; y < items1.length; y++)
 			{
@@ -62,13 +62,23 @@ public class DailyBonusItemDelay implements Runnable {
 					player.getInventory().addItem(is);
 				}
 			}
-			if(plugin.getConfig().getBoolean("Main.Global Message is Enabled"))
+			if(plugin.config.getBoolean("Main.Global Message is Enabled"))
 			{
-				plugin.getServer().broadcastMessage(DailyBonusPlayerListener.replaceColors(plugin.getConfig().getString("Main.Global Message").replaceAll("!amount", "" + amount).replaceAll("!playername", "" + player.getDisplayName())));
+				plugin.getServer().broadcastMessage(DailyBonusPlayerListener.replaceColors(plugin.config.getString("Main.Global Message").replaceAll("!amount", "" + amount).replaceAll("!playername", "" + player.getDisplayName())));
 			}
 		}
-		
-
+		if(plugin.numEarly.containsKey(player))
+		{
+			int num = plugin.numEarly.get(player);
+			if(num <= 1)
+			{
+				plugin.numEarly.remove(player);
+			}
+			else
+			{
+				plugin.numEarly.remove(player);
+				plugin.numEarly.put(player, (num-1));
+			}
+		}
 	}
-
 }
