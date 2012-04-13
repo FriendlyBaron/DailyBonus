@@ -1,6 +1,10 @@
 package me.itsatacoshop247.DailyBonus;
 
 import java.io.File;
+
+//random amounts
+
+//meta data on items
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,9 +15,13 @@ import java.util.List;
 
 import net.milkbowl.vault.economy.Economy;
 
+import org.bukkit.ChatColor;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -52,9 +60,12 @@ public class DailyBonus extends JavaPlugin
 		
 		this.configFile = new File(getDataFolder(), "config.yml");
 		this.playersFile = new File(getDataFolder(), "players.yml");
-		try {
+		try 
+		{
 			firstRun();
-		} catch (Exception e) {
+		} 
+		catch (Exception e) 
+		{
 			e.printStackTrace();
 		}
 		this.config = new YamlConfiguration();
@@ -64,64 +75,105 @@ public class DailyBonus extends JavaPlugin
 		players.options().copyDefaults(true);
 	}
 	
-	private void firstRun() throws Exception {
-		if (!this.playersFile.exists()) {
+	@EventHandler
+	public boolean onCommand(CommandSender sender, Command cmd, String commandLabel, String[] args){
+		if(cmd.getName().equalsIgnoreCase("DailyBonus"))
+		{
+			if(args.length > 0)
+			{
+				if(args[0].equalsIgnoreCase("Reload"))
+				{
+					this.savePlayers();
+					this.loadYamls();
+					sender.sendMessage(ChatColor.GOLD + "DailyBonus has been reloaded.");
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+	
+	private void firstRun() throws Exception 
+	{
+		if (!this.playersFile.exists()) 
+		{
 			this.playersFile.getParentFile().mkdirs();
 			copy(getResource("players.yml"), this.playersFile);
 			this.configFile.delete();
 		}
-		if (!this.configFile.exists()) {
+		if (!this.configFile.exists()) 
+		{
 			this.configFile.getParentFile().mkdirs();
 			copy(getResource("config.yml"), this.configFile);
 		}
 	}
 	
-	private void copy(InputStream in, File file) {
-		try {
+	private void copy(InputStream in, File file) 
+	{
+		try 
+		{
 			OutputStream out = new FileOutputStream(file);
 			byte[] buf = new byte[1024];
 			int len;
-			while ((len = in.read(buf)) > 0) {
+			while ((len = in.read(buf)) > 0) 
+			{
 				out.write(buf, 0, len);
 			}
 			out.close();
 			in.close();
-		} catch (Exception e) {
+		} 
+		catch (Exception e) 
+		{
 			e.printStackTrace();
 		}
 	}
 
-	public void loadYamls() {
-		try {
+	public void loadYamls() 
+	{
+		try 
+		{
 			this.config.load(this.configFile);
 			this.players.load(this.playersFile);
-		} catch (Exception e) {
+		} 
+		catch (Exception e) 
+		{
 			e.printStackTrace();
 		}
 	}
 
-	public void saveConfig() {
-		try {
+	public void saveConfig() 
+	{
+		try 
+		{
 			this.config.save(this.configFile);
-		} catch (IOException e) {
+		} 
+		catch (IOException e) 
+		{
 			e.printStackTrace();
 		}
 	}
 	
-	public void savePlayers() {
-		try {
+	public void savePlayers() 
+	{
+		try 
+		{
 			this.players.save(this.playersFile);
-		} catch (IOException e) {
+		} 
+		catch (IOException e) 
+		{
 			e.printStackTrace();
 		}
 	}
 	
-	private boolean setupEconomy() {
-        if (getServer().getPluginManager().getPlugin("Vault") == null) {
+	private boolean setupEconomy() 
+	{
+        if (getServer().getPluginManager().getPlugin("Vault") == null) 
+        {
             return false;
         }
         RegisteredServiceProvider<Economy> rsp = getServer().getServicesManager().getRegistration(Economy.class);
-        if (rsp == null) {
+        if (rsp == null) 
+        {
             return false;
         }
         econ = rsp.getProvider();

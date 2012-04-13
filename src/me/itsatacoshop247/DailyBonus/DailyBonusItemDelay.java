@@ -59,7 +59,14 @@ public class DailyBonusItemDelay implements Runnable {
 				if(!line[0].equals("0"))
 				{
 					ItemStack is = new ItemStack(Material.getMaterial(Integer.parseInt(line[0])), Integer.parseInt(line[1]));
-					player.getInventory().addItem(is);
+					if(player.getInventory().firstEmpty() < 0)
+					{
+						player.getWorld().dropItemNaturally(player.getEyeLocation(), is);
+					}
+					else
+					{
+						player.getInventory().addItem(is);
+					}
 				}
 			}
 			if(plugin.config.getBoolean("Main.Global Message is Enabled"))

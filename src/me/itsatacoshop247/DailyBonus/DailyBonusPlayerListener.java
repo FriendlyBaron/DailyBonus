@@ -70,7 +70,14 @@ public class DailyBonusPlayerListener implements Listener //part of new method, 
 						if(!line[0].equals("0"))
 						{
 							ItemStack is = new ItemStack(Material.getMaterial(Integer.parseInt(line[0])), Integer.parseInt(line[1]));
-							player.getInventory().addItem(is);
+							if(player.getInventory().firstEmpty() < 0)
+							{
+								player.getWorld().dropItemNaturally(player.getEyeLocation(), is);
+							}
+							else
+							{
+								player.getInventory().addItem(is);
+							}
 						}
 					}
 					if(plugin.config.getBoolean("Main.Global Message is Enabled"))
@@ -87,6 +94,8 @@ public class DailyBonusPlayerListener implements Listener //part of new method, 
 	public void onPlayerQuit(PlayerQuitEvent event)
 	{
 		Player player = event.getPlayer();
+		long login = plugin.players.getLong("Players." + player.getName() + ".Last");
+		
 		if(plugin.players.get("Players." + player.getName() + ".Last") != null)
 		{
 			plugin.players.set(("Players." + player.getName() + ".Last"), System.currentTimeMillis());
@@ -114,6 +123,16 @@ public class DailyBonusPlayerListener implements Listener //part of new method, 
 				plugin.numEarly.put(player, 1);
 			}
 		}
+		
+		Calendar current = Calendar.getInstance();
+		Calendar last = Calendar.getInstance();
+		last.setTimeInMillis(login);
+		
+		if(last.get(Calendar.DATE) < current.get(Calendar.DATE) || (last.get(Calendar.MONTH) + 1) < (current.get(Calendar.MONTH) + 1) || (last.get(Calendar.YEAR)) < (current.get(Calendar.YEAR)))
+		{
+			plugin.players.set("Players." + player.getName() + ".Logged Early", true);
+		}
+		
 	}
 
 	private boolean CheckLastLogin(Player p) {
@@ -131,7 +150,7 @@ public class DailyBonusPlayerListener implements Listener //part of new method, 
 			Calendar last = Calendar.getInstance();
 			last.setTimeInMillis(plugin.players.getLong("Players." + p.getName() + ".Last"));
 			
-			if(last.get(Calendar.DATE) < current.get(Calendar.DATE) || (last.get(Calendar.MONTH) + 1) < (current.get(Calendar.MONTH) + 1))
+			if(last.get(Calendar.DATE) < current.get(Calendar.DATE) || (last.get(Calendar.MONTH) + 1) < (current.get(Calendar.MONTH) + 1) || (last.get(Calendar.YEAR)) < (current.get(Calendar.YEAR)))
 			{
 				return true;
 			}
