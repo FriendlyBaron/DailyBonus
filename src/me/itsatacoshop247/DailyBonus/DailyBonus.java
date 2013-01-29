@@ -5,19 +5,24 @@ import java.io.File;
 //random amounts
 
 //meta data on items
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.logging.Logger;
 
 import net.milkbowl.vault.economy.Economy;
 
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -29,14 +34,14 @@ public class DailyBonus extends JavaPlugin
 {
 	public static Economy econ = null;
 	
-	public List<Player> playerList = new ArrayList<Player>();
+	public HashSet<String> playerList = new HashSet<String>();
 	
-	public HashMap<Player, Integer> numEarly = new HashMap<Player, Integer>();
+	public HashMap<String, Integer> numEarly = new HashMap<String, Integer>();
 	
 	File configFile;
-	File playersFile;
 	FileConfiguration config;
-	FileConfiguration players;
+	
+	public Logger log = Logger.getLogger("Minecraft");
 	
 	public void onDisable() 
 	{
@@ -46,8 +51,29 @@ public class DailyBonus extends JavaPlugin
 		{
 			for(int x = 0; x < players.length; x++)
 			{
-				this.players.set(("Players." + players[x].getName() + ".Last"), System.currentTimeMillis());
-				this.savePlayers();
+				File file = new File(this.getDataFolder().getAbsolutePath()+"/players/"+players[x].getName()+".yml");
+				FileConfiguration pfile = new YamlConfiguration();
+				try {
+					pfile.load(file);
+				} catch (FileNotFoundException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (InvalidConfigurationException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				pfile.set(("Time.Last"), System.currentTimeMillis());
+				
+				try {
+					pfile.save(file);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 			}
 		}
 	}
@@ -59,7 +85,6 @@ public class DailyBonus extends JavaPlugin
 		setupEconomy();
 		
 		this.configFile = new File(getDataFolder(), "config.yml");
-		this.playersFile = new File(getDataFolder(), "players.yml");
 		try 
 		{
 			firstRun();
@@ -69,10 +94,10 @@ public class DailyBonus extends JavaPlugin
 			e.printStackTrace();
 		}
 		this.config = new YamlConfiguration();
-		this.players = new YamlConfiguration();
 		loadYamls();
 		config.options().copyDefaults(true);
-		players.options().copyDefaults(true);
+		
+		this.updateConfig();
 	}
 	
 	@EventHandler
@@ -83,28 +108,136 @@ public class DailyBonus extends JavaPlugin
 			{
 				if(args[0].equalsIgnoreCase("Reload"))
 				{
-					this.savePlayers();
-					this.loadYamls();
-					sender.sendMessage(ChatColor.GOLD + "DailyBonus has been reloaded.");
-					return true;
+					if(!sender.hasPermission("dailybonus.reload"))
+					{
+						sender.sendMessage(ChatColor.WHITE + "You don't have dailybonus.reload permissions!");
+					}
+					else
+					{
+						Player[] players = this.getServer().getOnlinePlayers();
+						if(players.length > 0)
+						{
+							for(int x = 0; x < players.length; x++)
+							{
+								File file = new File(this.getDataFolder().getAbsolutePath()+"/players/"+players[x].getName()+".yml");
+								FileConfiguration pfile = new YamlConfiguration();
+								try {
+									pfile.load(file);
+								} catch (FileNotFoundException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								} catch (IOException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								} catch (InvalidConfigurationException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								}
+								
+								pfile.set(("Time.Last"), System.currentTimeMillis());
+								
+								try {
+									pfile.save(file);
+								} catch (IOException e) {
+									e.printStackTrace();
+								}
+							}
+						}
+						
+						this.loadYamls();
+						sender.sendMessage(ChatColor.GOLD + "DailyBonus has been reloaded.");
+						return true;
+					}
 				}
+			}
+			else
+			{
+				sender.sendMessage(ChatColor.YELLOW + this.getName() + " by " + this.getDescription().getAuthors() +". Version " + this.getDescription().getVersion() + ".");
+				sender.sendMessage("Use '" + ChatColor.YELLOW + "/DailyBonus reload" + ChatColor.WHITE + "' to reload the plugin.");
+				return true;
 			}
 		}
 		return false;
 	}
 	
+	private void updateConfig() 
+	{
+		HashMap<String, String> items = new HashMap<String, String>();
+		
+		items = loadConfigurables(items);
+		
+		int num = 0;
+		for(Map.Entry<String, String> item : items.entrySet())
+		{
+			if(this.config.get(item.getKey()) == null)
+			{
+				if(item.getValue().equalsIgnoreCase("LIST"))
+				{
+					List<String> list = Arrays.asList("LIST ITEMS GO HERE");
+					this.config.addDefault(item.getKey(), list);
+				}
+				else if(item.getValue().equalsIgnoreCase("true"))
+				{
+					this.config.addDefault(item.getKey(), true);
+				}
+				else if(item.getValue().equalsIgnoreCase("false"))
+				{
+					this.config.addDefault(item.getKey(), false);
+				}
+				else if(isInteger(item.getValue()))
+				{
+					this.config.addDefault(item.getKey(), Integer.parseInt(item.getValue()));
+				}
+				else
+				{
+					this.config.addDefault(item.getKey(), item.getValue());
+				}
+				num++;
+			}
+		}
+		if(num > 0)
+		{
+			this.log.info("[DailyBonus] " + num + " missing items added to config file.");
+		}
+		this.saveConfig();
+	}
+
+	public boolean isInteger(String input)  
+	{  
+	   try  
+	   {  
+	      Integer.parseInt(input);  
+	      return true;  
+	   }  
+	   catch(Exception e)  
+	   {  
+	      return false; 
+	   }  
+	} 
+
+	private HashMap<String, String> loadConfigurables(HashMap<String, String> items) 
+	{
+		//1.0
+		items.put("Main.Number of Tiers", "1");
+		items.put("Main.Item Give Delay (In Seconds)", "0");
+		items.put("Main.Global Message", "&9[DailyBonus] &6!playername just got abonus of !amount !type for logging in today!");
+		items.put("Main.Global Message is Enabled", "true");
+		
+		return items;
+	}
+	
 	private void firstRun() throws Exception 
 	{
-		if (!this.playersFile.exists()) 
-		{
-			this.playersFile.getParentFile().mkdirs();
-			copy(getResource("players.yml"), this.playersFile);
-			this.configFile.delete();
-		}
 		if (!this.configFile.exists()) 
 		{
 			this.configFile.getParentFile().mkdirs();
 			copy(getResource("config.yml"), this.configFile);
+		}
+		
+		File file = new File(this.getDataFolder().getAbsolutePath()+"/players");
+		if(!file.exists())
+		{
+			file.mkdir();
 		}
 	}
 	
@@ -133,7 +266,6 @@ public class DailyBonus extends JavaPlugin
 		try 
 		{
 			this.config.load(this.configFile);
-			this.players.load(this.playersFile);
 		} 
 		catch (Exception e) 
 		{
@@ -146,18 +278,6 @@ public class DailyBonus extends JavaPlugin
 		try 
 		{
 			this.config.save(this.configFile);
-		} 
-		catch (IOException e) 
-		{
-			e.printStackTrace();
-		}
-	}
-	
-	public void savePlayers() 
-	{
-		try 
-		{
-			this.players.save(this.playersFile);
 		} 
 		catch (IOException e) 
 		{

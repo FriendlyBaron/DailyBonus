@@ -1,0 +1,40 @@
+Main:
+  Number of Tiers: 3
+  Item Give Delay (In Seconds): 0
+  Global Message: "&9[DailyBonus] &6!playername just got a bonus of !amount !type for logging in today!"
+  Global Message is Enabled: true
+Tier:
+  1:
+    Economy Amount: 5
+    Message: "&6You were given &4!amount !type &6for joining today!"
+    Items:
+    - 5;5-1
+    - 357;1
+    Commands:
+  2:
+    Economy Amount: 10
+    Message: "&6You were given &4!amount !type &6for joining today!"
+    Items:
+    - 265;2
+    - 364;5
+    Commands:
+    - give !player 5 10
+  3:
+    Economy Amount: 20
+    Message: "&6You were given &4!amount !type &6for joining today!"
+    Items:
+    - 266;5
+    - 22;10;5
+    - 372;1
+    - 5;10;5-1
+    Commands:
+    - god !player
+    - give !player 4 10
+Notes:
+- Tiers are defined with the highest number being the highest Tier. Hence why Tier 3 give a larger amount by default than 1 or 2 do.
+- To make a new Tier, copy and past one of the current Tiers below, and simply change the number to the next highest. Also make sure to change the Number of Tiers in the main.
+- An amount of Economy Amount= 20;5 would give a random amount between 15 and 25. 5 in either direction.
+- You can delete the Items= list to give no items, or make it one line of 0;0 to also give no items.
+- In the item lists, the order is Item Id;Amount;Randomness*dash*Data Num.
+- So 5;10;5*dash*1 would give Anywhere from 5 to 15 dark-wood planks. (10 to start, then randomly 0 to 5 more or less) (*dash*1 become a data of 1, the darkwood)
+- Please use the Ticket system on bukkitDev for all issues with the plugin!

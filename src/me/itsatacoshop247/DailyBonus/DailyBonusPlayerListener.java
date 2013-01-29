@@ -1,5 +1,8 @@
 package me.itsatacoshop247.DailyBonus;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.Calendar;
 import java.util.List;
 
@@ -7,6 +10,9 @@ import net.milkbowl.vault.economy.EconomyResponse;
 
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.configuration.InvalidConfigurationException;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -14,10 +20,8 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 
-
 public class DailyBonusPlayerListener implements Listener //part of new method, instead of extends
 {
-	
 	public DailyBonus plugin;
 	
 	public DailyBonusPlayerListener(DailyBonus instance)
@@ -25,8 +29,8 @@ public class DailyBonusPlayerListener implements Listener //part of new method, 
 		plugin = instance;
 	}
 	
-	@EventHandler
-	public void onPlayerJoin(PlayerJoinEvent event)
+	@EventHandler(ignoreCancelled = true)
+	public void onPlayerJoin(PlayerJoinEvent event) throws FileNotFoundException, IOException, InvalidConfigurationException
 	{
 		Player player = event.getPlayer();
 		
@@ -42,14 +46,23 @@ public class DailyBonusPlayerListener implements Listener //part of new method, 
 				if(plugin.config.getInt("Main.Item Give Delay (In Seconds)") > 0)
 				{
 					Runnable r = new DailyBonusItemDelay(plugin, player, x);
-					new Thread(r).start();
-					plugin.playerList.add(player);
+					plugin.getServer().getScheduler().scheduleSyncDelayedTask(plugin, r, 20*plugin.config.getInt("Main.Item Give Delay (In Seconds)"));
+					plugin.playerList.add(player.getName());
 					x = -666;
 				}
 				else
 				{
-					int amount = plugin.config.getInt("Tier." + x + ".Economy Amount");
-					if(amount != 0)
+					int amount = 0;
+					String amt = plugin.config.getString("Tier." + x + ".Economy Amount");
+					if(amt.split(";").length > 1)
+					{
+						amount = Integer.parseInt(amt.split(";")[0]) + (int)((Math.random()*(Integer.parseInt(amt.split(";")[1])*2))-Integer.parseInt(amt.split(";")[1]));
+					}
+					else
+					{
+						amount = plugin.config.getInt("Tier." + x + ".Economy Amount");
+					}
+					if(amount > 0)
 					{
 						if(DailyBonus.econ != null)
 						{
@@ -61,66 +74,115 @@ public class DailyBonusPlayerListener implements Listener //part of new method, 
 							player.sendMessage(ChatColor.DARK_RED + "The DailyBonus plugin would have given you economy money, but the server doesn't have Vault enabled, or it is not enabled correctly!");
 						}
 					}
-					player.sendMessage(replaceColors(plugin.config.getString("Tier." + x + ".Message").replaceAll("!amount", "" + amount)));
-					List<?> items = plugin.config.getList("Tier." + x + ".Items");
-					String[] items1 = (String[]) items.toArray(new String[0]);
-					for(int y = 0; y < items1.length; y++)
+					player.sendMessage(replaceColors(plugin.config.getString("Tier." + x + ".Message").replaceAll("!amount", "" + amount).replaceAll("!type", "" + DailyBonus.econ.currencyNamePlural())));
+					if(plugin.config.get("Tier." + x + ".Items") != null)
 					{
-						String[] line = items1[y].split(";");
-						if(!line[0].equals("0"))
+						@SuppressWarnings("unchecked")
+						List<String> items = (List<String>) plugin.config.getList("Tier." + x + ".Items");
+						
+						for(String itemsline : items)
 						{
-							ItemStack is = new ItemStack(Material.getMaterial(Integer.parseInt(line[0])), Integer.parseInt(line[1]));
-							if(player.getInventory().firstEmpty() < 0)
-							{
-								player.getWorld().dropItemNaturally(player.getEyeLocation(), is);
+							String[] line = itemsline.split(";");
+							String [] data = itemsline.split("-");
+							if(!line[0].equals("0"))
+							{								
+								ItemStack is = new ItemStack(Material.getMaterial(Integer.parseInt(line[0])), Integer.parseInt(line[1]));
+								if(data.length > 1)
+								{
+									is.setDurability(Short.parseShort(data[1]));
+								}
+								
+								if(line.length > 2)
+								{
+									is.setAmount(Integer.parseInt(line[1]) + (int)((Math.random()*(Integer.parseInt(line[2].split("-")[0])*2))-Integer.parseInt(line[2].split("-")[0])));
+								}
+								
+								if(player.getInventory().firstEmpty() < 0)
+								{
+									player.getWorld().dropItemNaturally(player.getEyeLocation(), is);
+								}
+								else
+								{
+									player.getInventory().addItem(is);
+								}
 							}
-							else
-							{
-								player.getInventory().addItem(is);
-							}
+						}
+					}
+					if(plugin.config.get("Tier." + x + ".Commands") != null)
+					{
+						@SuppressWarnings("unchecked")
+						List<String> cmds = (List<String>) plugin.config.getList("Tier." + x + ".Commands");
+						
+						for(String cmd : cmds)
+						{
+							cmd = cmd.replaceAll("!player", player.getName());
+							plugin.getServer().dispatchCommand(plugin.getServer().getConsoleSender(), cmd);
 						}
 					}
 					if(plugin.config.getBoolean("Main.Global Message is Enabled"))
 					{
-						plugin.getServer().broadcastMessage(replaceColors(plugin.config.getString("Main.Global Message").replaceAll("!amount", "" + amount).replaceAll("!playername", "" + player.getDisplayName())));
+						for(Player p : plugin.getServer().getOnlinePlayers())
+						{
+							if(!p.equals(player))
+							{
+								p.sendMessage(replaceColors(plugin.config.getString("Main.Global Message").replaceAll("!amount", "" + amount).replaceAll("!playername", "" + player.getDisplayName()).replaceAll("!type", "" + DailyBonus.econ.currencyNamePlural())));
+							}
+						}
 					}
 					x = -666;
 				}
 			}
-		}	
-	}	
-
-	@EventHandler
-	public void onPlayerQuit(PlayerQuitEvent event)
-	{
-		Player player = event.getPlayer();
-		long login = plugin.players.getLong("Players." + player.getName() + ".Last");
+		}
+		File file = new File(plugin.getDataFolder().getAbsolutePath()+"/players/"+player.getName()+".yml");
+		FileConfiguration pfile = new YamlConfiguration();
+		pfile.load(file);
 		
-		if(plugin.players.get("Players." + player.getName() + ".Last") != null)
+		if(pfile.get("Time.Last") != null)
 		{
-			plugin.players.set(("Players." + player.getName() + ".Last"), System.currentTimeMillis());
-			plugin.savePlayers();
+			pfile.set(("Time.Last"), System.currentTimeMillis());
+			pfile.save(file);
 		}
 		else
 		{
-			plugin.players.addDefault("Players." + player.getName() + ".Last", System.currentTimeMillis());
-			plugin.savePlayers();
+			pfile.set("Time.Last", System.currentTimeMillis());
+			pfile.save(file);
+		}
+	}	
+
+	@EventHandler
+	public void onPlayerQuit(PlayerQuitEvent event) throws FileNotFoundException, IOException, InvalidConfigurationException
+	{
+		Player player = event.getPlayer();
+		
+		File file = new File(plugin.getDataFolder().getAbsolutePath()+"/players/"+player.getName()+".yml");
+		FileConfiguration pfile = new YamlConfiguration();
+		pfile.load(file);
+		
+		long login = pfile.getLong("Time.Last");
+		
+		if(pfile.get("Time.Last") != null)
+		{
+			pfile.set(("Time.Last"), System.currentTimeMillis());
+		}
+		else
+		{
+			pfile.set("Time.Last", System.currentTimeMillis());
 		}
 		
-		if(plugin.playerList.contains(player))
+		if(plugin.playerList.contains(player.getName()))
 		{
-			plugin.players.set("Players." + player.getName() + ".Logged Early", true);
-			plugin.playerList.remove(player);
+			pfile.set("Time.Logged Early", true);
+			plugin.playerList.remove(player.getName());
 			
-			if(plugin.numEarly.containsKey(player))
+			if(plugin.numEarly.containsKey(player.getName()))
 			{
-				int already = plugin.numEarly.get(player);
-				plugin.numEarly.remove(player);
-				plugin.numEarly.put(player, (already+1));
+				int already = plugin.numEarly.get(player.getName());
+				plugin.numEarly.remove(player.getName());
+				plugin.numEarly.put(player.getName(), (already+1));
 			}
 			else
 			{
-				plugin.numEarly.put(player, 1);
+				plugin.numEarly.put(player.getName(), 1);
 			}
 		}
 		
@@ -130,37 +192,48 @@ public class DailyBonusPlayerListener implements Listener //part of new method, 
 		
 		if(last.get(Calendar.DATE) < current.get(Calendar.DATE) || (last.get(Calendar.MONTH) + 1) < (current.get(Calendar.MONTH) + 1) || (last.get(Calendar.YEAR)) < (current.get(Calendar.YEAR)))
 		{
-			plugin.players.set("Players." + player.getName() + ".Logged Early", true);
+			pfile.set("Time.Logged Early", true);
 		}
-		
+		pfile.save(file);
 	}
 
-	private boolean CheckLastLogin(Player p) {
-		if(plugin.players.get("Players." + p.getName() + ".Logged Early") != null)
+	private boolean CheckLastLogin(Player p) throws FileNotFoundException, IOException, InvalidConfigurationException 
+	{
+		File file = new File(plugin.getDataFolder().getAbsolutePath()+"/players/"+p.getName()+".yml");
+		if(!file.exists())
 		{
-			if(plugin.players.getBoolean("Players." + p.getName() + ".Logged Early"))
+			file.createNewFile();
+			FileConfiguration pfile = new YamlConfiguration();
+			pfile.load(file);
+			pfile.set("Time.Last", System.currentTimeMillis());
+			pfile.set("Time.Logged Early", false);
+			pfile.save(file);
+			
+			return true;
+		}
+		FileConfiguration pfile = new YamlConfiguration();
+		pfile.load(file);
+		
+		if(pfile.get("Time.Logged Early") != null)
+		{
+			if(pfile.getBoolean("Time.Logged Early"))
 			{
-				plugin.players.set("Players." + p.getName() + ".Logged Early", false);
+				pfile.set("Time.Logged Early", false);
+				pfile.save(file);
 				return true;
 			}
 		}
-		if(plugin.players.get("Players." + p.getName() + ".Last") != null)
+		
+		if(pfile.get("Time.Last") != null)
 		{
 			Calendar current = Calendar.getInstance();
 			Calendar last = Calendar.getInstance();
-			last.setTimeInMillis(plugin.players.getLong("Players." + p.getName() + ".Last"));
+			last.setTimeInMillis(pfile.getLong("Time.Last"));
 			
 			if(last.get(Calendar.DATE) < current.get(Calendar.DATE) || (last.get(Calendar.MONTH) + 1) < (current.get(Calendar.MONTH) + 1) || (last.get(Calendar.YEAR)) < (current.get(Calendar.YEAR)))
 			{
 				return true;
 			}
-		}
-		else
-		{
-			plugin.players.addDefault("Players." + p.getName() + ".Last", System.currentTimeMillis());
-			plugin.players.addDefault("Players." + p.getName() + ".Logged Early", false);
-			plugin.savePlayers();
-			return true;
 		}
 		return false;
 	}
