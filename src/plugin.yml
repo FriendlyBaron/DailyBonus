@@ -1,0 +1,13 @@
+name: DailyBonus
+main: me.itsatacoshop247.DailyBonus.DailyBonus
+version: 3.6
+author: itsatacoshop247
+description: DailyBonus
+dev-url: http://dev.bukkit.org/server-mods/daily-bonus/
+commands:
+  DailyBonus:
+    description: Reload the DailyBonus config.
+    usage: /<command> reload
+    aliases: [db, DB]
+    permission: dailybonus.reload
+    permission-message: You don't have dailybonus.reload permission.

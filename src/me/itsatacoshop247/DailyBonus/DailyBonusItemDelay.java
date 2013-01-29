@@ -24,21 +24,19 @@ public class DailyBonusItemDelay implements Runnable {
 	@Override
 	public void run() 
 	{
-		if(plugin.isEnabled())
+		if(player.isOnline() && plugin.isEnabled() && !plugin.numEarly.containsKey(player.getName()))
 		{
-			try
+			int amount = 0;
+			String amt = plugin.config.getString("Tier." + this.num + ".Economy Amount");
+			if(amt.split(";").length > 1)
 			{
-				Thread.sleep(plugin.config.getInt("Main.Item Give Delay (In Seconds)")*1000);
+				amount = Integer.parseInt(amt.split(";")[0]) + (int)((Math.random()*(Integer.parseInt(amt.split(";")[1])*2))-Integer.parseInt(amt.split(";")[1]));
 			}
-			catch (InterruptedException e)
+			else
 			{
-				e.printStackTrace();
+				amount = plugin.config.getInt("Tier." + this.num + ".Economy Amount");
 			}
-		}
-		if(player.isOnline() && plugin.isEnabled() && !plugin.numEarly.containsKey(player))
-		{
-			int amount = plugin.config.getInt("Tier." + num + ".Economy Amount");
-			if(amount != 0)
+			if(amount > 0)
 			{
 				if(DailyBonus.econ != null)
 				{
@@ -51,41 +49,79 @@ public class DailyBonusItemDelay implements Runnable {
 				}
 			}
 			player.sendMessage(DailyBonusPlayerListener.replaceColors(plugin.config.getString("Tier." + num + ".Message").replaceAll("!amount", "" + amount)));
-			List<?> items = plugin.config.getList("Tier." + num + ".Items");
-			String[] items1 = (String[]) items.toArray(new String[0]);
-			for(int y = 0; y < items1.length; y++)
+			if(plugin.config.get("Tier." + num + ".Items") != null)
 			{
-				String[] line = items1[y].split(";");
-				if(!line[0].equals("0"))
+				@SuppressWarnings("unchecked")
+				List<String> items = (List<String>) plugin.config.getList("Tier." + num + ".Items");
+				for(String itemsline : items)
 				{
-					ItemStack is = new ItemStack(Material.getMaterial(Integer.parseInt(line[0])), Integer.parseInt(line[1]));
-					if(player.getInventory().firstEmpty() < 0)
+					String[] line = itemsline.split(";");
+					String [] data = itemsline.split("-");
+					if(!line[0].equals("0"))
 					{
-						player.getWorld().dropItemNaturally(player.getEyeLocation(), is);
+						ItemStack is = new ItemStack(Material.getMaterial(Integer.parseInt(line[0])), Integer.parseInt(line[1]));
+						if(data.length > 1)
+						{
+							is.setDurability(Short.parseShort(data[1]));
+						}
+						
+						if(line.length > 2)
+						{
+							is.setAmount(Integer.parseInt(line[1]) + (int)((Math.random()*(Integer.parseInt(line[2].split("-")[0])*2))-Integer.parseInt(line[2].split("-")[0])));
+						}
+						
+						if(player.getInventory().firstEmpty() < 0)
+						{
+							player.getWorld().dropItemNaturally(player.getEyeLocation(), is);
+						}
+						else
+						{
+							player.getInventory().addItem(is);
+						}
 					}
-					else
-					{
-						player.getInventory().addItem(is);
-					}
+				}
+			}
+			if(plugin.config.get("Tier." + num + ".Commands") != null)
+			{
+				@SuppressWarnings("unchecked")
+				List<String> cmds = (List<String>) plugin.config.getList("Tier." + num + ".Commands");
+				
+				for(String cmd : cmds)
+				{
+					cmd = cmd.replaceAll("!player", player.getName());
+					plugin.getServer().dispatchCommand(plugin.getServer().getConsoleSender(), cmd);
 				}
 			}
 			if(plugin.config.getBoolean("Main.Global Message is Enabled"))
 			{
-				plugin.getServer().broadcastMessage(DailyBonusPlayerListener.replaceColors(plugin.config.getString("Main.Global Message").replaceAll("!amount", "" + amount).replaceAll("!playername", "" + player.getDisplayName())));
+				for(Player p : plugin.getServer().getOnlinePlayers())
+				{
+					if(!p.equals(player))
+					{
+						p.sendMessage(replaceColors(plugin.config.getString("Main.Global Message").replaceAll("!amount", "" + amount).replaceAll("!playername", "" + player.getDisplayName()).replaceAll("!type", "" + DailyBonus.econ.currencyNamePlural())));
+					}
+				}
 			}
 		}
-		if(plugin.numEarly.containsKey(player))
+		plugin.playerList.remove(player.getName());
+		
+		if(plugin.numEarly.containsKey(player.getName()))
 		{
-			int num = plugin.numEarly.get(player);
+			int num = plugin.numEarly.get(player.getName());
 			if(num <= 1)
 			{
-				plugin.numEarly.remove(player);
+				plugin.numEarly.remove(player.getName());
 			}
 			else
 			{
-				plugin.numEarly.remove(player);
-				plugin.numEarly.put(player, (num-1));
+				plugin.numEarly.remove(player.getName());
+				plugin.numEarly.put(player.getName(), (num-1));
 			}
 		}
+	}
+	
+	static String replaceColors (String message) 
+	{
+		return message.replaceAll("(?i)&([a-f0-9])", "\u00A7$1");
 	}
 }
